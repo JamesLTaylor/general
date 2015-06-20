@@ -183,4 +183,4 @@ def id_from_mic():
 """
 """
 global_counter = 0
-id_from_mic()    
+id_from_file()
