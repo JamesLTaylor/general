@@ -2,13 +2,51 @@ import numpy as np
 import cv2
 import moviepy.editor
 
-#fname = r'C:\Dev\python\video\GBFULL_ORIGINALConverted.avi'
-#fname = r'C:\Dev\python\video\Gbfull Original mpeg4.mp4'
-#fname = r'C:\Dev\python\video\GBFULL ORIGINAL MPEG4Converted.avi'
-#fname = r'C:\Dev\python\video\SAMPLE.avi'
+#fname = r'C:\Dev\python\general\video\GBFULL_ORIGINALConverted.avi'
+#fname = r'C:\Dev\python\general\video\Gbfull Original mpeg4.mp4'
+#fname = r'C:\Dev\python\general\video\GBFULL ORIGINAL MPEG4Converted.avi'
+#fname = r'C:\Dev\python\general\video\SAMPLE.avi'
+
+def make_frame_list(clip):
+    frames = []
+    for i in range(25*20):
+        frame = make_frame(i/25.0, clip)
+        frame = frame[:,:,::-1]
+        frames.append(frame)
+        
+    return frames
+
+def make_frame_simple(t, clip):
+    return clip.get_frame(t)
+
+def make_frame(t, clip):
+    print(t)
+    thisframe = clip.get_frame(t)
+    thisframe = thisframe[:,:,::-1]
+    thisframe = cv2.cvtColor(thisframe, cv2.COLOR_BGR2YCrCb)        
+    
+    prevframe = clip.get_frame(t-1.0/25)
+    prevframe = prevframe[:,:,::-1]
+    prevframe = cv2.cvtColor(prevframe, cv2.COLOR_BGR2YCrCb)
+    
+    newframe = np.zeros(thisframe.shape, dtype = 'uint8')
+    
+    newframe[0::2,:,0] = thisframe[0::2,:,0] 
+    newframe[1::2,:,0] = prevframe[1::2,:,0]
+    
+    newframe[:,:,0] = median_channel_0(newframe[:,:,0])
+    
+    newframe[:,:,1] = block_and_blur(thisframe[:,:,1], prevframe[:,:,1])
+    newframe[:,:,2] = block_and_blur(thisframe[:,:,2], prevframe[:,:,2])
+    
+    newframe_ycbcr = newframe
+    newframe = cv2.cvtColor(newframe, cv2.COLOR_YCrCb2BGR)        
+    
+    return newframe
+        
 
 def mix_lines(clip):
-    offset = 200
+    offset = 0
     nframes = 2000
     slowdown = 1
     thisframe = clip.get_frame(1/25.0)
@@ -70,7 +108,7 @@ def mix_lines(clip):
     
     cv2.destroyAllWindows()    
     """        
-    pth = r'C:\Dev\python\video\frames'
+    pth = r'C:\Dev\python\general\video\frames'
 
     cv2.imwrite(pth + "\\thisframe_0.png",thisframe[:,:,0])         
     cv2.imwrite(pth + "\\thisframe_1.png",thisframe[:,:,1]) 
@@ -88,7 +126,7 @@ def mix_lines(clip):
     """    
 
 def split_lines(clip):
-    pth = r'C:\Dev\python\video\frames'
+    pth = r'C:\Dev\python\general\video\frames'
     
     offset = 0
     nframes = 500
@@ -220,7 +258,7 @@ def block_and_blur(thisframe1, prevframe1):
     
     
 def block_and_blur_test():
-    pth = r'C:\Dev\python\video\frames'
+    pth = r'C:\Dev\python\general\video\frames'
     thisframe1 = cv2.imread(pth + "\\thisframe_1.png", flags = 0)     
     prevframe1 = cv2.imread(pth + "\\prevframe_1.png", flags = 0)
 
@@ -236,19 +274,35 @@ def median_channel_0(mixed0):
     return mixed0_median
     
 def median_channel_0_test():
-    pth = r'C:\Dev\python\video\frames'
+    pth = r'C:\Dev\python\general\video\frames'
     mixed0 = cv2.imread(pth + "\\mixed_0.png", flags = 0)
     mixed0_median = median_channel_0(mixed0)
     cv2.imwrite(pth + "\\mixed_0_median.png",mixed0_median)    
     
 
 
-# fname = r'C:\Dev\python\video\GummiBearsV2E04 MyGummiLiesOverTheOcean.m4v'
-fname = r'C:\Dev\python\video\title00.mkv'
+# fname = r'C:\Dev\python\general\video\GummiBearsV2E04 MyGummiLiesOverTheOcean.m4v'
+fname = r'C:\Dev\python\general\video\title00.mkv'
 clip = moviepy.editor.VideoFileClip(fname)
 
+outfile = r'C:\Dev\python\general\video\movie3.mp4'
+outfilesound = r'C:\Dev\python\general\video\movie3.mp3'
+
+#make_frame_lam = lambda t : make_frame_simple(t, clip)
+# newclip = moviepy.editor.VideoClip(make_frame_lam, 5)
+
+framelist = make_frame_list(clip)
+newclip = moviepy.editor.ImageSequenceClip(framelist, fps=25)
+audioclip = clip.audio.subclip(0,20)
+newclip = newclip.set_audio(audioclip)
+
+newclip = newclip.set_duration(20)
+audioclip.write_audiofile(outfilesound)
+newclip.write_videofile(outfile,fps=25)
+
+
 #show_versions(clip)
-mix_lines(clip)
+#mix_lines(clip)
 #block_and_blur_test()
 
 
