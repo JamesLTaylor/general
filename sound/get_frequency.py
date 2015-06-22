@@ -2,6 +2,8 @@ import pyaudio
 import wave
 import matplotlib.pyplot as plt
 import numpy as np
+import time
+import note_trainer
 
 def max_abs_multiple_diff(peak_frequencies, number):
     candidate = peak_frequencies[0]/number   
@@ -66,12 +68,19 @@ def get_note(frequency):
     if frequency<10:
         return "#NA"        
         
-    notes = ['A','A#','B','C','C#','D','D#','E','F','F#','G','G#']
+    names = ['A','A#','B','C','C#','D','D#','E','F','F#','G','G#']
     middle_a = 440.0
     count = int(np.round(12*np.log2(frequency/440.0)))
-    note_ind = count % 12
-    octaves = (count + note_ind)/12
-    return notes[note_ind] + " " + str(octaves)
+    name_ind = count % 12
+    octave_int = count//12 + 1
+    if len(names[name_ind])==2:
+        name = names[name_ind-1]
+        incidental = "sharp"
+    else:
+        name = names[name_ind]
+        incidental = "natural"
+    note = note_trainer.Note(name, incidental, octave_int = octave_int)        
+    return note
     
 def get_freq(indata, rate):
     frequencies = (np.arange(0, len(indata)/2)-1)*rate/len(indata)
@@ -82,24 +91,27 @@ def get_freq(indata, rate):
     # thefreq = find_lowest_peak_freq(fftData, frequencies)
     thefreq = find_peak(fftData, frequencies, rate)
     print("The freq is %f Hz." % (thefreq))
-    print("The note is : " + get_note(thefreq))
+    note = get_note(thefreq)
+    print("The note is : " + str(note))
     
     global global_counter
     np.save(r"C:\Dev\python\general\sound\data" + "{:03}".format(global_counter) + ".npy", indata)
     print("wrote {:03}".format(global_counter))    
     global_counter+=1
     
-def id_from_file():    
+    return (thefreq, note)
+    
+def id_from_file(gui_caller=None):    
     chunk = 1024*2
-    fname = r"C:\Dev\python\general\sound\piano_1.wav"
+    fname = r"C:\Dev\python\general\sound\piano_1_soft.wav"
     wf = wave.open(fname, 'rb')
     swidth = wf.getsampwidth()
     rate = wf.getframerate()
     
     get_data_func = lambda chunk : wf.readframes(chunk)    
-    id_from_source(get_data_func, chunk, swidth, rate, playback=True)
+    id_from_source(get_data_func, chunk, swidth, rate, playback=True, gui_caller=gui_caller )
     
-def id_from_source(get_data_func, chunk, swidth, rate, playback=False):   
+def id_from_source(get_data_func, chunk, swidth, rate, playback=False, gui_caller=None):   
     """ Single channel
     """
     if playback:
@@ -134,8 +146,10 @@ def id_from_source(get_data_func, chunk, swidth, rate, playback=False):
          
         time = counter*chunk/44.1
         if was_note: # after the volume picked up get the next chunk as the note
-            get_freq(indata, rate)            
-            was_note = False
+            (freq, note) = get_freq(indata, rate)            
+            if gui_caller:
+                gui_caller.set_note(note)
+            was_note = False # reset the note watcher
             print(str(np.round(time)) + "ms")
         
         # note flagged by volume above base and step up in volume and time since last note        
@@ -178,9 +192,16 @@ def id_from_mic():
     stream.close()
     audio.terminate()
     
-    
-    
-"""
-"""
+def simple_test(caller):
+    time.sleep(1)
+    caller.set_note(note_trainer.Note("A", "natural", octave_int=1))
+    time.sleep(1)
+    caller.set_note(note_trainer.Note("C", "natural", octave_int=0))
+    time.sleep(1)
+    caller.set_note(note_trainer.Note("E", "natural", octave_int=1))
+    time.sleep(1)
+
 global_counter = 0
-id_from_file()
+    
+if __name__ == "__main__": 
+    id_from_file()

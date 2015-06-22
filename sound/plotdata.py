@@ -2,8 +2,6 @@ import time
 import scipy.io.wavfile
 import matplotlib.pyplot as plt
 
-for i = 0:len
-
 # 5.3 - 5.48
 a = int(5.3*44100)
 b = int(5.48 * 44100)
@@ -23,12 +21,13 @@ plt.plot(x, y)
 #    time.sleep(2)    
 """
 
-fname = r"C:\Dev\python\general\sound\data043.npy"
+#1, 2, and 5 are picking up second harmonic
+plt.figure()
 rate = 44100.0
-data = np.load(r"C:\Dev\python\general\sound\data043.npy")
+data = np.load(r"C:\Dev\python\general\sound\data008.npy")
 frequencies = (np.arange(0, len(data)/2)-1)*rate/len(data)
 plt.plot(data)
 
 fftData=abs(np.fft.rfft(data))**2
 plt.figure()
-plt.plot(frequencies, fftData[1:])
+plt.plot(frequencies, np.log(fftData[:-1]))
