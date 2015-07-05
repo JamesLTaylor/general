@@ -1,33 +1,36 @@
-import time
-import scipy.io.wavfile
-import matplotlib.pyplot as plt
 
-# 5.3 - 5.48
-a = int(5.3*44100)
-b = int(5.48 * 44100)
-
-"""fname = r"C:\Dev\python\general\sound\piano_1_soft.wav"
-
-(rate, data) = scipy.io.wavfile.read(WAVE_OUTPUT_FILENAME, mmap=False)
-
-y = data[a:b]
-x = 5.3 + np.arange(0,len(y)) * (5.48-5.3)
-plt.plot(x, y)
 
 #for i in range(20):#range(int(round(len(data)/10000))):
 #    plt.clf()
 #    plt.plot(data[i*10000:(i+1)*10000])
 #    plt.draw()
 #    time.sleep(2)    
-"""
 
 #1, 2, and 5 are picking up second harmonic
-plt.figure()
-rate = 44100.0
-data = np.load(r"C:\Dev\python\general\sound\data008.npy")
-frequencies = (np.arange(0, len(data)/2)-1)*rate/len(data)
-plt.plot(data)
 
+rate = 44100.0
+data = np.load(r"C:\Dev\python\general\sound\data002.npy")
+frequencies = (np.arange(0, len(data)/2+1))*rate/len(data)
+
+window = np.blackman(len(data))
+data = data*window
 fftData=abs(np.fft.rfft(data))**2
 plt.figure()
-plt.plot(frequencies, np.log(fftData[:-1]))
+plt.plot(data)
+plt.figure()
+plt.plot(frequencies, np.log(fftData))
+plt.xlim((100, 5000))
+
+y = np.log(fftData[1:-1])
+d = np.diff(y)
+allpeaks = np.logical_and(d[1:-1]>0, d[2:]<0)
+for i in np.where(allpeaks)[0]: 
+    if i<10:    
+        allpeaks[i] = False
+    elif y[i-1]<np.max(y[i-5:i+5]):
+        allpeaks[i] = False
+
+peakvals = y[2:][np.where(allpeaks)]
+nth_highest = np.sort(peakvals)[-5]
+peaks = np.logical_and(allpeaks, y[2:-1]>=nth_highest)
+plt.plot(frequencies[2:][peaks], y[2:-1][peaks], 'ro')
