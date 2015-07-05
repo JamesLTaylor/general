@@ -7,6 +7,7 @@ import wave
 import numpy as np
 import time
 import get_frequency
+import Queue
 
 import matplotlib.pyplot as plt
 import matplotlib
@@ -89,7 +90,32 @@ class Application(Tk.Frame):
         options['title'] = 'This is a title'
         self.note = None
         self.setup()
-        self.grid(row = 0, column = 0)
+        self.grid(row = 0, column = 0)        
+        self.q = Queue.Queue()
+        self.after(100, self.check_queue)
+
+    def on_main_thread(self, func):
+        self.q.put(func)
+
+    def check_queue(self):
+        while True:
+            try:
+                task = self.q.get(block=False)
+            except Queue.Empty:
+                break
+            else:
+                self.after_idle(task)
+        root.after(100, self.check_queue)
+        
+    def updatebutton(self, value):
+        self.button_record["text"] = value
+        
+        
+    def countdown(self):        
+        for i in range(5): 
+            func = lambda: self.updatebutton(str(i))
+            self.on_main_thread(func)
+            time.sleep(1)
         
     def clear_and_draw_staff(self):        
         self.canvas1.delete("all")
@@ -228,6 +254,10 @@ class Application(Tk.Frame):
         get_frequency.play(self.fname_play_var.get())
         
     def record(self):
+        t = threading.Thread(target=self.countdown)
+        t.start()
+
+        """        
         duration = 10
         self.button_record["text"] = "______"
         t = threading.Thread(target=get_frequency.record, args=(self.fname_record_var.get(), duration))
@@ -236,6 +266,7 @@ class Application(Tk.Frame):
         #get_frequency.record(self.fname_record_var.get(), 10)
         
         self.button_record["text"] = "Record"
+        """
         
     def update_signal(self, time, signal):        
         self.signal_axis.cla()
