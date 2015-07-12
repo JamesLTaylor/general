@@ -26,8 +26,6 @@ class Note():
     
     # 17 is the C above middle C
     def __init__(self, name, incidental, **kwargs):
-        self.gui_busy = threading.Lock()        
-        
         self.name = name
         self.incidental = incidental
 
@@ -42,42 +40,14 @@ class Note():
     
     def __str__(self):
         return self.name + " " + self.incidental + " " + str(self.octave_number)
-        
-    def draw_unsafe(self, caller):
-        pass
-        
-    
-    def draw(self, caller):
-        x = 200
-        
-        
-        if self.offset % 2:
-            y = 98 - (self.offset / 2)*11
-        else:
-            y = 92 - ((self.offset - 1) / 2)*11
             
-        caller.get_staff_canvas().create_image(x, y, anchor=Tk.NW, image = caller.get_quarter())
-        if self.offset<0:
-            caller.get_staff_canvas().create_line(x+14, y+5, x+14, y-40)
-        else:
-            caller.get_staff_canvas().create_line(x, y+5, x, y+45)
-            
-        # add helper lines        
-        gap = 11
-        if self.offset<-4:
-            start = 137
-            nlines = (-3 - self.offset)//2
-            for i in range(nlines):
-                caller.get_staff_canvas().create_line(x-10, start+gap*i, x+24, start+gap*i)
-        elif self.offset>6:
-            start = 71
-            nlines = (self.offset-5)//2
-            for i in range(nlines):
-                caller.get_staff_canvas().create_line(x-10, start-gap*i, x+24, start-gap*i)
+    def get_offset(self):
+        return self.offset        
 
 class Application(Tk.Frame):
     
     def __init__(self, master):
+        self.close = False
         self.gui_busy = threading.Lock()
         Tk.Frame.__init__(self, master)
         self.file_opt = options = {}
@@ -89,13 +59,17 @@ class Application(Tk.Frame):
         options['parent'] = root
         options['title'] = 'This is a title'
         self.note = None
-        self.setup()
-        self.grid(row = 0, column = 0)        
         self.q = Queue.Queue()
+        self.setup()
+        self.grid(row = 0, column = 0)
+        #master.protocol("WM_DELETE_WINDOW", self.on_closing)
+        
         self.after(100, self.check_queue)
+   
 
     def on_main_thread(self, func):
         self.q.put(func)
+        
 
     def check_queue(self):
         while True:
@@ -105,24 +79,72 @@ class Application(Tk.Frame):
                 break
             else:
                 self.after_idle(task)
-        root.after(100, self.check_queue)
+        if not self.close:
+            root.after(100, self.check_queue)
+        
         
     def updatebutton(self, value):
-        self.button_record["text"] = value
+        self.button_record["text"] = value        
         
+        left = 140
+        right = 540
+        start = 82
+        gap = 11
+        
+        for i in range(5):
+            self.canvas1.create_line(left, start+gap*i, right, start+gap*i)
+        self.canvas1.create_image(200, 200, anchor=Tk.NW, image = self.quarter)
         
     def countdown(self):        
         for i in range(5): 
             func = lambda: self.updatebutton(str(i))
             self.on_main_thread(func)
-            time.sleep(1)
+            time.sleep(0.2)
+            
+    def draw_note(self):
+        x = 200
+        offset = self.note.get_offset()
+        if offset % 2:
+            y = 98 - (offset / 2)*11
+        else:
+            y = 92 - ((offset - 1) / 2)*11
+            
+        self.canvas1.create_image(x, y, anchor=Tk.NW, image = self.quarter)
+        if offset<0:
+            self.canvas1.create_line(x+14, y+5, x+14, y-40)
+        else:
+            self.canvas1.create_line(x, y+5, x, y+45)
+            
+        # add helper lines        
+        gap = 11
+        if offset<-4:
+            start = 137
+            nlines = (-3 - offset)//2
+            for i in range(nlines):
+                self.canvas1.create_line(x-10, start+gap*i, x+24, start+gap*i)
+        elif offset>6:
+            start = 71
+            nlines = (offset-5)//2
+            for i in range(nlines):
+                self.canvas1.create_line(x-10, start-gap*i, x+24, start-gap*i)
+
+                    
+            
         
-    def clear_and_draw_staff(self):        
+    def clear_and_draw_staff(self):
+        """ Redraws the staff on the main thread
+        """        
+        self.on_main_thread(self.__clear_and_draw_staff)
+         
+
+    def __clear_and_draw_staff(self):
+        """ Redraws the staff, should not be called from anything other than the main thread
+        """        
         self.canvas1.delete("all")
         image = self.canvas1.create_image(50, 50, anchor=Tk.NW, image=self.staff)                
 
-        if self.note:
-            self.note.draw(self)
+        if self.note:            
+            self.draw_note()
         
         left = 140
         right = 540
@@ -134,19 +156,13 @@ class Application(Tk.Frame):
         
         start = 197
         for i in range(5):
-            self.canvas1.create_line(left, start+gap*i, right, start+gap*i)                
+            self.canvas1.create_line(left, start+gap*i, right, start+gap*i)                 
     
-    def get_quarter(self):
-        return self.quarter
-        
-    def get_staff_canvas(self):
-        return self.canvas1
-        
+       
     def setup(self):
-
         # images to be used
-        self.quarter = Tk.PhotoImage(file = r"C:\Dev\python\general\sound\quarter.gif")
-        self.staff = Tk.PhotoImage(file = r"C:\Dev\python\general\sound\grandstaff2.gif")                
+        self.quarter = Tk.PhotoImage(file = r"C:\Dev\python\general\sound\images\quarter.gif")
+        self.staff = Tk.PhotoImage(file = r"C:\Dev\python\general\sound\images\grandstaff2.gif")                
         
         # the main part of the window
         self.main_frame = Tk.Frame(self)
@@ -193,7 +209,7 @@ class Application(Tk.Frame):
         l = Tk.Label(self.file_play_frame, text="file to play/analyse")
         l.pack(side = Tk.LEFT)
         self.fname_play_var = Tk.StringVar(self.file_play_frame)        
-        self.fname_play_var.set(r"C:\Dev\python\general\sound\piano_1_soft.wav")
+        self.fname_play_var.set(self.path + "\\piano_1_soft.wav")
         self.fname_play = Tk.Entry(self.file_play_frame, width=50)
         self.fname_play["textvariable"] = self.fname_play_var
         self.fname_play.pack(side = Tk.LEFT)
@@ -236,11 +252,13 @@ class Application(Tk.Frame):
         self.main_frame.grid(row = 0, column = 0)      
         
         self.clear_and_draw_staff()
-        
+
+        """
         self.draw_signal()
         self.update_signal([1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,10])
         self.draw_fft()
         self.update_fft([1,2,3,4,5,6,7,8],[1,2,3,4,5,6,7,8])
+        """
         
     def get_filename_play(self):
         filename = tkFileDialog.askopenfilename(**self.file_opt)
@@ -254,7 +272,9 @@ class Application(Tk.Frame):
         get_frequency.play(self.fname_play_var.get())
         
     def record(self):
-        t = threading.Thread(target=self.countdown)
+        self.running = True
+        #t = threading.Thread(target=self.countdown)
+        t = threading.Thread(target=get_frequency.simple_test, args=(self, ))
         t.start()
 
         """        
@@ -283,7 +303,10 @@ class Application(Tk.Frame):
         self.fft_axis.set_xlabel('frequency (Hz)')
         self.fft_canvas.show()
         
-    def draw_signal(self):        
+    def draw_signal(self):
+        """ 
+        draw a canvas to contain a plot of the signal
+        """        
         self.signal_frame = Tk.Frame(self)
         f = Figure(figsize=(12,4), dpi=100)
         self.signal_axis = f.add_subplot(111)
@@ -345,8 +368,9 @@ class Application(Tk.Frame):
         t.start() 
         
     def analyse_f(self):
-        self.running = True        
-        t = threading.Thread(target=get_frequency.id_from_file, args=(self.fname_play_var.get(), self))        
+        self.running = True
+        fname = self.fname_play_var.get()        
+        t = threading.Thread(target=get_frequency.id_from_file, args=(fname, self))        
         t.start()         
         
     def stop(self):
@@ -361,7 +385,6 @@ class Application(Tk.Frame):
         
         :param new_note: an instance of note_trainer.Note
         """
-        print(str(new_note))
         self.note = new_note
         self.clear_and_draw_staff()
 
@@ -374,6 +397,8 @@ if __name__ == "__main__":
     
     app = Application(root)
     root.update()
+    
+    
     
     #canvas = FigureCanvasTkAgg(f, master=root)
     #canvas.show()

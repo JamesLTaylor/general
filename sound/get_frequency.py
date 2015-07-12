@@ -162,7 +162,7 @@ def id_from_file(fname, gui_caller=None):
     rate = wf.getframerate()
     
     get_data_func = lambda chunk : wf.readframes(chunk)    
-    id_from_source2(get_data_func, swidth, rate, playback=True, gui_caller=gui_caller )
+    id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=gui_caller )
     
 def id_from_mic(gui_caller=None):
     FORMAT = pyaudio.paInt16
@@ -271,7 +271,8 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
                 # Get the note here
                 note_inds.append((time_counter-min_note_length)*chunk)
                 note = get_freq2(sample, rate)
-                if not gui_caller==None:
+                #note = None
+                if not gui_caller==None:                    
                     gui_caller.set_note(note)
                 else:
                     print(note)                
@@ -286,13 +287,13 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
         stream.close()
         p.terminate() 
     
-    
-    x = np.arange(0,len(y)) / 44.1 
-    plt.figure()
-    plt.plot(x,y)
-    for (i1, i2) in enumerate(note_inds):
-        plt.axvline(x[i2], linewidth=2, color='r')
-        plt.axvline(x[i2 + min_note_length*chunk], linewidth=2, color='g')    
+    if gui_caller==None:
+        x = np.arange(0,len(y)) / 44.1 
+        plt.figure()
+        plt.plot(x,y)
+        for (i1, i2) in enumerate(note_inds):
+            plt.axvline(x[i2], linewidth=2, color='r')
+            plt.axvline(x[i2 + min_note_length*chunk], linewidth=2, color='g')    
     
     
 def id_from_source(get_data_func, chunk, swidth, rate, playback=False, gui_caller=None, stop_func=None):   
@@ -339,12 +340,13 @@ def id_from_source(get_data_func, chunk, swidth, rate, playback=False, gui_calle
             #t = threading.Thread(target=gui_caller.update_signal, args=(time_steps + time, indata))        
             #t.start() 
             if counter % 4 == 0:
-                gui_caller.update_signal(time_steps + time, indata)
+                #gui_caller.update_signal(time_steps + time, indata)
+                pass
         if was_note: # after the volume picked up get the next chunk as the note
             (freq, note, frequencies, fftData) = get_freq(indata, rate)            
             if gui_caller:
                 gui_caller.set_note(note)
-                gui_caller.update_fft(frequencies, fftData)
+                #gui_caller.update_fft(frequencies, fftData)
             was_note = False # reset the note watcher
             print(str(np.round(time)) + "ms")
         
@@ -427,13 +429,14 @@ def play(fname):
 
     
 def simple_test(caller):
-    time.sleep(1)
+    print(caller.is_running())
     caller.set_note(note_trainer.Note("A", "natural", octave_int=1))
     time.sleep(1)
     caller.set_note(note_trainer.Note("C", "natural", octave_int=0))
     time.sleep(1)
     caller.set_note(note_trainer.Note("E", "natural", octave_int=1))
     time.sleep(1)
+    print(caller.is_running())
 
 global_counter = 0
     
