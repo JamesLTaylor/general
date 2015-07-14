@@ -36,7 +36,26 @@ class Note():
             self.octave_number = kwargs['octave_int']
         else:
             raise Exception("either octave_str, or octave_int must be set in the kwargs")
-        self.offset = Note.available_names.index(name) + self.octave_number*7 - 7        
+        self.offset = Note.available_names.index(name) + self.octave_number*7 - 7     
+        
+    @classmethod
+    def from_frequency(cls, frequency):
+        if frequency<10:
+            return None        
+            
+        names = ['A','A#','B','C','C#','D','D#','E','F','F#','G','G#']
+        middle_a = 440.0
+        count = int(np.round(12*np.log2(frequency/440.0)))
+        name_ind = count % 12
+        octave_int = count//12 + 1
+        if len(names[name_ind])==2:
+            name = names[name_ind-1]
+            incidental = "sharp"
+        else:
+            name = names[name_ind]
+            incidental = "natural"
+        note = cls(name, incidental, octave_int = octave_int)        
+        return note        
     
     def __str__(self):
         return self.name + " " + self.incidental + " " + str(self.octave_number)
@@ -83,23 +102,9 @@ class Application(Tk.Frame):
             root.after(100, self.check_queue)
         
         
-    def updatebutton(self, value):
-        self.button_record["text"] = value        
+    def updatebutton(self, button, value):
+        button["text"] = value        
         
-        left = 140
-        right = 540
-        start = 82
-        gap = 11
-        
-        for i in range(5):
-            self.canvas1.create_line(left, start+gap*i, right, start+gap*i)
-        self.canvas1.create_image(200, 200, anchor=Tk.NW, image = self.quarter)
-        
-    def countdown(self):        
-        for i in range(5): 
-            func = lambda: self.updatebutton(str(i))
-            self.on_main_thread(func)
-            time.sleep(0.2)
             
     def draw_note(self):
         x = 200
@@ -269,9 +274,10 @@ class Application(Tk.Frame):
         self.fname_record_var.set(filename)        
         
     def play(self):
-        get_frequency.play(self.fname_play_var.get())
+        t = threading.Thread(target=get_frequency.play, args=(self.fname_play_var.get(), ))
+        t.start()
         
-    def record(self):
+    def record(self):        
         self.running = True
         #t = threading.Thread(target=self.countdown)
         t = threading.Thread(target=get_frequency.simple_test, args=(self, ))
@@ -364,6 +370,7 @@ class Application(Tk.Frame):
 
     def analyse(self):
         self.running = True
+        self.updatebutton(self.button_analyse, "Busy")
         t = threading.Thread(target=get_frequency.id_from_mic, args=(self, ))
         t.start() 
         
@@ -374,7 +381,8 @@ class Application(Tk.Frame):
         t.start()         
         
     def stop(self):
-        self.running = False        
+        self.running = False
+        self.updatebutton(self.button_analyse, "Analyse (Mic)")
         
     def is_running(self):
         return self.running

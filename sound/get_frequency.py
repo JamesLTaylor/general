@@ -5,6 +5,7 @@ import numpy as np
 import time
 import threading
 import note_trainer
+import analyse
 
 def max_abs_multiple_diff(peak_frequencies, number):
     candidate = peak_frequencies[0]/number   
@@ -65,24 +66,6 @@ def find_peak(fftData, frequencies, RATE):
     
     return thefreq
 
-def get_note(frequency):
-    if frequency<10:
-        return None        
-        
-    names = ['A','A#','B','C','C#','D','D#','E','F','F#','G','G#']
-    middle_a = 440.0
-    count = int(np.round(12*np.log2(frequency/440.0)))
-    name_ind = count % 12
-    octave_int = count//12 + 1
-    if len(names[name_ind])==2:
-        name = names[name_ind-1]
-        incidental = "sharp"
-    else:
-        name = names[name_ind]
-        incidental = "natural"
-    note = note_trainer.Note(name, incidental, octave_int = octave_int)        
-    return note
-    
 def get_freq(indata, rate):
     frequencies = (np.arange(0, len(indata)/2)-1)*rate/len(indata)
     window = np.blackman(len(indata))
@@ -103,29 +86,6 @@ def get_freq(indata, rate):
     global_counter+=1
     
     return (thefreq, note, frequencies, fftData)
-    
-    
-def freq_from_harmonics(peaks):
-    """ Get the lowest frequency consistent with the observed harmonics
-    
-    :param peaks: a Nx3 numpy array of frequency, unused, and peak score 
-       
-    :returns: the candidate frequency
-    """
-    max_freq = 7040
-    new_peaks = peaks[peaks[:,0]<=max_freq,0:3:2]
-    width = 0.03 # approx 2^(1/24)
-    for i in range(len(new_peaks)):
-        for multiplier in range(2,6):
-            f = new_peaks[i,0]*multiplier
-            j = i
-            while  peaks[j,0]<=f*(1+width) and j<(len(new_peaks)-1):
-                j += 1
-                if np.abs((peaks[j,0]-f)/f)<width:
-                    new_peaks[i,1] += peaks[j,2]
-                    break
-                
-    return (new_peaks[np.argmax(new_peaks[:,1]),0], new_peaks)       
     
     
 def get_freq2(sample, rate):
@@ -162,7 +122,7 @@ def id_from_file(fname, gui_caller=None):
     rate = wf.getframerate()
     
     get_data_func = lambda chunk : wf.readframes(chunk)    
-    id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=gui_caller )
+    id_from_source2(get_data_func, swidth, rate, playback=True, gui_caller=gui_caller )
     
 def id_from_mic(gui_caller=None):
     FORMAT = pyaudio.paInt16
@@ -185,7 +145,7 @@ def id_from_mic(gui_caller=None):
     else:
         stop_func = lambda t : t > RECORD_SECONDS
     
-    id_from_source(get_data_func, chunk, swidth, RATE, playback=False, gui_caller=gui_caller, stop_func=stop_func)
+    id_from_source2(get_data_func, swidth, RATE, playback=False, gui_caller=gui_caller, stop_func=stop_func)
         
     # stop Recording
     stream.stop_stream()
@@ -198,6 +158,8 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
     chunk = 256 # 11.6ms
     min_note_length = 24 # approx 140ms
     max_note_length = 24
+    processor = analyse.ProcessNote()
+    processor.set_caller(gui_caller)
     if stop_func==None:
         stop_func = lambda t : False
     
@@ -216,12 +178,9 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
     
     time_counter = 0
     counter = 0
-    y=np.zeros((44100*10,))
-    note_inds = []
     
     # clear out the first milliseconds
     data = get_data_func(chunk)        
-    time_counter += 1
 
     # get the baseline readings:
     for i in range(min_note_length):
@@ -229,15 +188,12 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
         indata = np.array(temp)
         sample[counter*chunk:(counter+1)*chunk] = indata    
         data = get_data_func(chunk)
-        time_counter += 1
         counter += 1
     
     base_volume = np.sqrt(np.mean(sample**2))
-    print(base_volume)
     avg_window = np.ones((2,))
     
     data = get_data_func(chunk)
-    time_counter += 1
     
     # process the source, if the source is a file, stop when the file is finished
     # if the source is the microphone then stop when the stop function says so
@@ -248,7 +204,6 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
             
         temp = wave.struct.unpack("%dh"%(len(data)/swidth), data)    
         indata = np.array(temp)
-        y[time_counter*chunk:(time_counter+1)*chunk] = indata
         
         new_avg = np.sqrt(np.mean(indata**2))
         if new_avg/np.min(avg_window) > 1.7 and new_avg > base_volume*5 and not in_a_note:
@@ -269,31 +224,27 @@ def id_from_source2(get_data_func, swidth, rate, playback=False, gui_caller=None
             else:
                 counter = 0                
                 # Get the note here
-                note_inds.append((time_counter-min_note_length)*chunk)
-                note = get_freq2(sample, rate)
-                #note = None
-                if not gui_caller==None:                    
-                    gui_caller.set_note(note)
-                else:
-                    print(note)                
-                
+                processor.get_freq_async(sample)                
                 in_a_note = False
-                
-        data = get_data_func(chunk)
-        time_counter += 1                 
+        
+        success = False
+        exit_count = 10
+        while not success and exit_count>0:        
+            exit_count -= 1
+            try:
+                data = get_data_func(chunk)
+                success = True
+            except:
+                print("ERROR!")
+                if exit_count==0:
+                    raise
+        
+            
    
         
     if playback:
         stream.close()
         p.terminate() 
-    
-    if gui_caller==None:
-        x = np.arange(0,len(y)) / 44.1 
-        plt.figure()
-        plt.plot(x,y)
-        for (i1, i2) in enumerate(note_inds):
-            plt.axvline(x[i2], linewidth=2, color='r')
-            plt.axvline(x[i2 + min_note_length*chunk], linewidth=2, color='g')    
     
     
 def id_from_source(get_data_func, chunk, swidth, rate, playback=False, gui_caller=None, stop_func=None):   
@@ -441,5 +392,5 @@ def simple_test(caller):
 global_counter = 0
     
 if __name__ == "__main__":
-    fname = r"C:\Dev\python\general\sound\piano_1_soft.wav"
+    fname = r"C:\Dev\python\general\sound\samples\piano_1_soft.wav"
     id_from_file(fname)
