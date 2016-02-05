@@ -28,6 +28,29 @@ def template_match(img, template, mask):
     r = TemplateMatch_C(<double*> c_img.data, rowsImg, colsImg, <double*> c_template.data, <double*> c_mask.data, rowsTpl, colsTpl, <double*> c_result.data)
     return c_result
     
+def template_match2(img, template, mask, offsetRows, offsetCols, pieceRows, pieceCols, rangeSize):
+
+    cdef np.ndarray[np.float_t, ndim=2] c_img
+    cdef np.ndarray[np.float_t, ndim=2] c_template
+    cdef np.ndarray[np.float_t, ndim=2] c_mask
+    cdef np.ndarray[np.float_t, ndim=2] c_result
+    
+    (rowsImg, colsImg) = img.shape
+    (rowsTpl, colsTpl) = template.shape
+    result = np.zeros(((rowsImg-rowsTpl), (colsImg - colsTpl)))
+    
+    c_img = np.ascontiguousarray(img, dtype=np.float)    
+    c_template = np.ascontiguousarray(template, dtype=np.float)
+    c_mask = np.ascontiguousarray(mask, dtype=np.float)
+    c_result = np.ascontiguousarray(result, dtype=np.float)
+    
+    #print(c_mask)
+    
+    r = TemplateMatch2_C(<double*> c_img.data, rowsImg, colsImg, <double*> c_template.data, 
+                         <double*> c_mask.data, rowsTpl, colsTpl, <double*> c_result.data, 
+                         offsetRows, offsetCols, pieceRows, pieceCols, rangeSize)
+    return c_result    
+    
 def template_match_v(img, template, mask):
 
     cdef np.ndarray[np.float_t, ndim=2] c_img
@@ -46,8 +69,33 @@ def template_match_v(img, template, mask):
     
     #print(c_mask)
     
-    r = TemplateMatch_V_C(<double*> c_img.data, rowsImg, colsImg, <double*> c_template.data, <double*> c_mask.data, rowsTpl, colsTpl, <double*> c_result.data)
-    return c_result    
+    r = TemplateMatch_V_C(<double*> c_img.data, rowsImg, colsImg, 
+                          <double*> c_template.data, <double*> c_mask.data, 
+                          rowsTpl, colsTpl, <double*> c_result.data)
+    return c_result  
+    
+def template_match_v2(img, template, mask, offsetRows, offsetCols, pieceRows, pieceCols, rangeSize):
+
+    cdef np.ndarray[np.float_t, ndim=2] c_img
+    cdef np.ndarray[np.float_t, ndim=2] c_template
+    cdef np.ndarray[np.float_t, ndim=2] c_mask
+    cdef np.ndarray[np.float_t, ndim=2] c_result
+    
+    (rowsImg, colsImg) = img.shape
+    (rowsTpl, colsTpl) = template.shape
+    result = np.zeros(((rowsImg-rowsTpl), (colsImg - colsTpl)))
+    
+    c_img = np.ascontiguousarray(img, dtype=np.float)    
+    c_template = np.ascontiguousarray(template, dtype=np.float)
+    c_mask = np.ascontiguousarray(mask, dtype=np.float)
+    c_result = np.ascontiguousarray(result, dtype=np.float)
+    
+    #print(c_mask)
+    
+    r = TemplateMatch_V2_C(<double*> c_img.data, rowsImg, colsImg, <double*> c_template.data, 
+                           <double*> c_mask.data, rowsTpl, colsTpl, <double*> c_result.data, 
+                           offsetRows, offsetCols, pieceRows, pieceCols, rangeSize)
+    return c_result     
     
 def template_match_fast(img, template, mask):
     

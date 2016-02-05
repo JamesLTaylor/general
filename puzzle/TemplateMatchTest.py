@@ -32,7 +32,25 @@ def template_match(img, template, mask):
 npzfile = np.load('TemplateMatchTest.npz')
 img = npzfile['img']
 template = npzfile['template']
-refResult = npzfile['result']
+x1 = npzfile['x1']+0
+x2 = npzfile['x2']+0
+y1 = npzfile['y1']+0
+y2 = npzfile['y2']+0
+(r, c, _) = template.shape
+topLeft = []
+topLeft.append((x1, y1))
+topLeft.append((y1, c-x2))
+topLeft.append((c-x2, r-y2))
+topLeft.append((r-y2, x1))
+print(topLeft)
+pieceRows = img.shape[0]/20.0
+pieceCols = img.shape[1]/25.0
+rangeSize = 4.0
+
+#template = np.rot90(np.rot90(np.rot90(template)))
+template = np.rot90(template, 0)
+offsetRows = topLeft[0][1]
+offsetCols = topLeft[0][0]
 
 cv2.imshow("puzzle example", img)
 cv2.imshow("piece example", template)
@@ -50,18 +68,36 @@ img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 #print("python error = " + str(np.mean(np.abs(refResult-result)) / np.mean(refResult)))    
 #cv2.imshow("result Python", result/np.max(result))
 
-t0 = time.time()
+#t0 = time.time()
 result = puzzleFunctionsC.template_match(img[:,:,0], template[:,:,0], mask)
 result += puzzleFunctionsC.template_match(img[:,:,1], template[:,:,1], mask)
 result += puzzleFunctionsC.template_match_v(img[:,:,2], template[:,:,2], mask)
-
-print("C time = " + str(time.time()-t0))    
-print("C error = " + str(np.mean(np.abs(refResult-result)) / np.mean(refResult)))  
+#print("C time = " + str(time.time()-t0))    
+#print("C error = " + str(np.mean(np.abs(refResult-result)) / np.mean(refResult)))  
 result = result - np.min(result)
 result = result/np.max(result)
 result = result * 5
 result[result>1] = 1
 cv2.imshow("result C", result)
+
+t0 = time.time()
+
+print((offsetRows, offsetCols, pieceRows, pieceCols, rangeSize))
+result = puzzleFunctionsC.template_match2(img[:,:,0], template[:,:,0], mask, 
+                                            offsetRows, offsetCols, pieceRows, pieceCols, rangeSize)
+result += puzzleFunctionsC.template_match2(img[:,:,1], template[:,:,1], mask, 
+                                            offsetRows, offsetCols, pieceRows, pieceCols, rangeSize)
+result += puzzleFunctionsC.template_match_v2(img[:,:,2], template[:,:,2], mask, 
+                                            offsetRows, offsetCols, pieceRows, pieceCols, rangeSize)
+print("C2 time = " + str(time.time()-t0))    
+#print("C error = " + str(np.mean(np.abs(refResult-result)) / np.mean(refResult)))  
+result[result<1e-6] = np.max(result)
+result = result - np.min(result)
+result = result/np.max(result)
+result = result * 5
+result[result>1] = 1
+cv2.imshow("result C2", result)
+
 
 
 #t0 = time.time()
@@ -73,7 +109,7 @@ cv2.imshow("result C", result)
 #cv2.imshow("result C (fast)", result1/np.max(result1))
 
 
-cv2.imshow("result ref", refResult/np.max(refResult))
+#cv2.imshow("result ref", refResult/np.max(refResult))
 cv2.waitKey()
 
 
